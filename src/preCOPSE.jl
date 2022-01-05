@@ -21,6 +21,10 @@ const 𝐲𝐫 = 31536000.0
 const 𝛔 = 5.67e-8 
 
 #------------------------------------------------------------------------------
+# functions
+export precopse
+
+#------------------------------------------------------------------------------
 # functions supporting the ODEs
 
 #fraction of carbon in the atmososphere [-]
@@ -63,7 +67,7 @@ function precopse!(du, u, p, t)::Nothing
     #atmospheric carbon concentration 
     pCO2 = 𝒻pCO2(A, h)
     #evaluate dP/dt
-    du[1] = k8*(𝒲(pCO2)/𝒲(pCO2₀)*(7/12) + (5/12)) - mocb(P,P₀)/CPsea - k2*mocb(P,P₀)/k1 - 𝒻fepb(P,P₀,O,O₀,k1,k3)
+    du[1] = k8*(𝒲(pCO2)/W₀*(7/12) + (5/12)) - mocb(P,P₀)/CPsea - k2*mocb(P,P₀)/k1 - 𝒻fepb(P,P₀,O,O₀,k1,k3)
     #evaluate dA/dt
     du[2] = k9*D + k10*D - 𝒲(pCO2) - mocb(P)
     nothing
