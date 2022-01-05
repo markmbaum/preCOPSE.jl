@@ -3,6 +3,9 @@ uuid = "d9b5de2a-7974-4db9-baf2-bb5265170031"
 authors = ["Minmin Fu <mjfu@g.harvard.edu>", "Mark Baum <markmbaum@protonmail.com>"]
 version = "0.1.0"
 
+[deps]
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+
 [compat]
 julia = "1.6"
 
