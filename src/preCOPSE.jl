@@ -29,15 +29,20 @@ const 𝛔 = 5.67e-8
 
 #partial pressure of CO2 [bar]
 # A - total ocean-atmososphere CO2 [mole]
-𝒻pCO2(A, h) = (𝒻ϕ(A,h)*A*0.044*𝐠/𝐒ₑ)/1e5
+𝒻pCO2(A, h) = (𝒻ϕ(A,h)*A*0.04401*𝐠/𝐒ₑ)/1e5
 
-#------------------------------------------------------------------------------
+# Marine organic carbon burial 
+𝒻mocb(k1,P,P₀) = k1*(P/P₀)^2
+
+# Iron-sorbed phosphate burial 
+𝒻fepb(P,P₀,O,O₀,k1,k3) = k3*(O/O₀*P₀/P)*𝒻mocb(k1,P,P₀)
+
 
 function precopse!(du, u, p, t)::Nothing
     #unpack phosphate and total carbon
     P, A = u
     #unpack weathering function W(pCO2)
-    𝒲 = p[1]
+    𝒲    = p[1]
     #unpack all the constants
     k1    = p[2]  # mol C yr⁻¹ Total organic carbon burial
     k2    = p[3]  # mol P yr⁻¹ Ca associated phosphorus burial
@@ -54,11 +59,13 @@ function precopse!(du, u, p, t)::Nothing
     P₀    = p[14] # mol        Present day ocean phosphate
     O₀    = p[15] # mol        Present day atmospheric oxgen
     h     = p[16] # mol        Partitioning value for pCO2
-    #atmospheric carbon concentration
-    pCO2 = 𝒻ϕ(A,h)*A*0.044*g/(2)
+    W₀    = p[17] # mol C yr⁻¹ Reference modern weathering
+    #atmospheric carbon concentration 
+    pCO2 = 𝒻pCO2(A, h)
     #evaluate dP/dt
-    du[1] = k8*()
-
+    du[1] = k8*(𝒲(pCO2)/𝒲(pCO2₀)*(7/12) + (5/12)) - mocb(P,P₀)/CPsea - k2*mocb(P,P₀)/k1 - 𝒻fepb(P,P₀,O,O₀,k1,k3)
+    #evaluate dA/dt
+    du[2] = k9*D + k10*D - 𝒲(pCO2) - mocb(P)
     nothing
 end
 
