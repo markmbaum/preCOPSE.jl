@@ -77,7 +77,7 @@ CPsea = 250      # mol:mol    C:P burial ratio
 A₀    = 3.193e18 # mol        Present day atmosphere/ocean CO2
 P₀    = 3.1e15   # mol        Present day ocean phosphate
 O₀    = 3.7e19   # mol        Present day atmosphere/ocean O2
-h     = 2.325e20 # mol        Partitioning value for pCO2
+h     = 2.32746  # mol        Partitioning value for pCO2
 W₀    = 7.5e12   # mol/yr     Past value of 
 
 p     = [mac,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,CPsea,A₀,P₀,O₀,h,W₀]

@@ -1,6 +1,9 @@
 module preCOPSE
 
+using UnPack
 using OrdinaryDiffEq
+using GEOCLIM: mac, whak
+export mac, whak
 
 #------------------------------------------------------------------------------
 # immutable physical constants
@@ -17,15 +20,51 @@ const 𝐠 = 9.8
 #seconds in a year
 const 𝐲𝐫 = 31536000.0
 
+#molar mass of CO2 [kg/mole]
+const 𝛍 = 0.044
+
 #stefan-boltzmann constant [m^-2 K^-4]
-const 𝛔 = 5.67e-8 
+const 𝛔 = 5.67e-8
 
 #------------------------------------------------------------------------------
-# functions
-export precopse
+# initializing parameter values for integration
+
+export initparams
+
+function initparams(;
+    W0::Real=7.5e12,
+    h::Real=2.32746,
+    k1::Real=4.5e12,
+    k2::Real=1.5e10,
+    k3::Real=6e9,
+    k7::Real=7.75e12,
+    k8::Real=5.7e10,
+    CPsea::Real=250,
+    P0::Real=3.1e15,
+    O::Real=1.76e18,
+    O0::Real=3.7e19,
+    V::Real=7.9e12)
+    #construct a named tuple containing all the parameters
+    (
+        W0    = Float64(W0),
+        h     = Float64(h),
+        k1    = Float64(k1),
+        k2    = Float64(k2),
+        k3    = Float64(k3),
+        k7    = Float64(k7),
+        k8    = Float64(k8),
+        CPsea = Float64(CPsea),
+        P0    = Float64(P0),
+        O     = Float64(O),
+        O0    = Float64(O0),
+        V     = Float64(V)
+    )
+end
 
 #------------------------------------------------------------------------------
-# functions supporting the ODEs
+# the system of ODES
+
+export 𝒻ϕ, 𝒻pCO2, 𝒻mocb, 𝒻fepb, ℱ!
 
 #fraction of carbon in the atmososphere [-]
 # A - total ocean-atmosphere CO2 [mole]
@@ -33,43 +72,47 @@ export precopse
 
 #partial pressure of CO2 [bar]
 # A - total ocean-atmososphere CO2 [mole]
-𝒻pCO2(A, h) = (𝒻ϕ(A,h)*A*0.04401*𝐠/𝐒ₑ)/1e5
+𝒻pCO2(A, h) = (𝒻ϕ(A,h)*A*𝛍*𝐠/𝐒ₑ)/1e5
 
-# Marine organic carbon burial 
-𝒻mocb(k1,P,P₀) = k1*(P/P₀)^2
+𝒻phosw(k₈, W, W₀) = k₈*(W/W₀ + 5/12)
+
+𝒻mopb(mocb, CPsea) = mocb/CPsea
+
+𝒻capb(k₂, mocb, mocb₀) = k₂*mocb/mocb₀
 
 # Iron-sorbed phosphate burial 
-𝒻fepb(P,P₀,O,O₀,k1,k3) = k3*(O/O₀*P₀/P)*𝒻mocb(k1,P,P₀)
+#𝒻fepb(P, P₀, O, O₀, k₁, k₃) = k₃*(O/O₀*P₀/P)*𝒻mocb(k₃,P,P₀)
+𝒻fepb(k₃, O, O₀, P, P₀, mocb, mocb₀) = k₃*(O/O₀)*(P₀/P)*(mocb/mocb₀)
 
+# Marine organic carbon burial 
+𝒻mocb(k₁, P, P₀) = k₁*(P/P₀)^2
 
-function precopse!(du, u, p, t)::Nothing
-    #unpack phosphate and total carbon
+𝒻oxidw(k₇, Wglacial=1.0) = k₇*Wglacial
+
+function ℱ!(du, u, param, t)::Nothing
+    #unpack phosphate and total carbon from input vector
     P, A = u
-    #unpack weathering function W(pCO2)
-    𝒲    = p[1]
-    #unpack all the constants
-    k1    = p[2]  # mol C yr⁻¹ Total organic carbon burial
-    k2    = p[3]  # mol P yr⁻¹ Ca associated phosphorus burial
-    k3    = p[4]  # mol P yr⁻¹ Fe associated phosphorus burial
-    k4    = p[5]  # -          Initial oxic fraction
-    k5    = p[6]  # mol C yr⁻¹ Silicate weathering
-    k6    = p[7]  # mol C yr⁻¹ Carbonate weathering
-    k7    = p[8]  # mol C yr⁻¹ Oxidative weathering
-    k8    = p[9]  # mol P yr⁻¹ Reactive phosphorus weathering
-    k9    = p[10] # mol C yr⁻¹ Organic carbon degassing
-    k10   = p[11] # mol C yr⁻¹ Carbonate carbon degassing
-    CPsea = p[12] # mol:mol    C:P burial ratio
-    A₀    = p[13] # mol        Present day atmosphere/ocean CO2
-    P₀    = p[14] # mol        Present day ocean phosphate
-    O₀    = p[15] # mol        Present day atmospheric oxgen
-    h     = p[16] # mol        Partitioning value for pCO2
-    W₀    = p[17] # mol C yr⁻¹ Reference modern weathering
-    #atmospheric carbon concentration 
+    #the weathering function is the first element of param
+    𝒻W = param[1]
+    #numeric parameters are in a named tuple in the second element
+    @unpack h, k8, W0, k1, P0, CPsea, k2, k3, O, O0, k7, V = param[2]
+    #atmospheric carbon concentration [bar]
     pCO2 = 𝒻pCO2(A, h)
+    #weathering rate [mol/yr]
+    W = 𝒻W(pCO2)
+    #derived quantities
+    phosw = 𝒻phosw(k8, W, W0)
+    mocb = 𝒻mocb(k1, P, P0)
+    mocb₀ = k1
+    mopb = 𝒻mopb(mocb, CPsea)
+    capb = 𝒻capb(k2, mocb, mocb₀)
+    fepb = 𝒻fepb(k3, O, O0, P, P0, mocb, mocb₀)
+    oxidw = 𝒻oxidw(k7)
     #evaluate dP/dt
-    du[1] = k8*(𝒲(pCO2)/W₀*(7/12) + (5/12)) - mocb(P,P₀)/CPsea - k2*mocb(P,P₀)/k1 - 𝒻fepb(P,P₀,O,O₀,k1,k3)
+    du[1] = phosw - mopb - capb - fepb
     #evaluate dA/dt
-    du[2] = k9*D + k10*D - 𝒲(pCO2) - mocb(P)
+    du[2] = -mocb - W + oxidw + V
+    #empty return value
     nothing
 end
 
