@@ -36,31 +36,33 @@ which can be overridden by keywords. Parameters will all have the same type,
 as specified by the only non-keyword arg.
 ===#
 function initparams(𝒯::Type=Float64;
-                    W0::Real=7.5e12,
-                    h::Real=2.32746,
-                    k1::Real=4.5e12,
-                    k2::Real=1.5e10,
-                    k3::Real=6e9,
-                    k7::Real=7.75e12,
-                    k8::Real=5.7e10,
+                    P₀::Real=6e15,
+                    A₀::Real=3.193e18,
+                    W₀::Real=7.5e12,
+                    h::Real=2.326925e20,
+                    k₁::Real=4.5e12,
+                    k₂::Real=1.5e10,
+                    k₃::Real=6e9,
+                    k₇::Real=4.5e12,
+                    k₈::Real=2.349558e10,
                     CPsea::Real=250,
-                    P0::Real=3.1e15,
                     O::Real=1.76e18,
-                    O0::Real=3.7e19,
-                    V::Real=7.9e12)
+                    O₀::Real=3.7e19,
+                    V::Real=7.5e12)
     (
-        W0    = 𝒯(W0),
-        h     = 𝒯(h),
-        k1    = 𝒯(k1),
-        k2    = 𝒯(k2),
-        k3    = 𝒯(k3),
-        k7    = 𝒯(k7),
-        k8    = 𝒯(k8),
-        CPsea = 𝒯(CPsea),
-        P0    = 𝒯(P0),
-        O     = 𝒯(O),
-        O0    = 𝒯(O0),
-        V     = 𝒯(V)
+        P₀    = convert(𝒯, P₀),
+        A₀    = convert(𝒯, A₀),
+        W₀    = convert(𝒯, W₀),
+        h     = convert(𝒯, h),
+        k₁    = convert(𝒯, k₁),
+        k₂    = convert(𝒯, k₂),
+        k₃    = convert(𝒯, k₃),
+        k₇    = convert(𝒯, k₇),
+        k₈    = convert(𝒯, k₈),
+        CPsea = convert(𝒯, CPsea),
+        O     = convert(𝒯, O),
+        O₀    = convert(𝒯, O₀),
+        V     = convert(𝒯, V)
     )
 end
 
@@ -92,44 +94,56 @@ export 𝒻ϕ, 𝒻pCO2, 𝒻mocb, 𝒻fepb, ℱ!
 
 𝒻oxidw(k₇, Wglacial=1.0) = k₇*Wglacial
 
-function ℱ!(du, u, param, t)::Nothing
-    #unpack phosphate and total carbon from input vector
-    P, A = u
-    #the weathering function is the first element of param
-    𝒻W = param[1]
-    #numeric parameters are in a named tuple in the second element
-    @unpack h, k8, W0, k1, P0, CPsea, k2, k3, O, O0, k7, V = param[2]
+function precopse(P, A, 𝒻W::F, params) where {F}
+    #unpack numeric parameters
+    @unpack P₀, W₀, h, k₁, k₂, k₃, k₇, k₈, CPsea, O, O₀, V = params
     #atmospheric carbon concentration [bar]
     pCO2 = 𝒻pCO2(A, h)
     #weathering rate [mol/yr]
     W = 𝒻W(pCO2)
     #derived quantities
-    phosw = 𝒻phosw(k8, W, W0)
-    mocb = 𝒻mocb(k1, P, P0)
-    mocb₀ = k1
+    phosw = 𝒻phosw(k₈, W, W₀)
+    mocb = 𝒻mocb(k₁, P, P₀)
+    mocb₀ = k₁
     mopb = 𝒻mopb(mocb, CPsea)
-    capb = 𝒻capb(k2, mocb, mocb₀)
-    fepb = 𝒻fepb(k3, O, O0, P, P0, mocb, mocb₀)
-    oxidw = 𝒻oxidw(k7)
+    capb = 𝒻capb(k₂, mocb, mocb₀)
+    fepb = 𝒻fepb(k₃, O, O₀, P, P₀, mocb, mocb₀)
+    oxidw = 𝒻oxidw(k₇)
     #evaluate dP/dt
-    du[1] = phosw - mopb - capb - fepb
+    dP = phosw - mopb - capb - fepb
     #evaluate dA/dt
-    du[2] = -mocb - W + oxidw + V
-    #empty return value
+    dA = -mocb - W + oxidw + V
+    return dP, dA
+end
+
+function precopse!(d, P, A, 𝒻W::F, params)::Nothing where {F}
+    d[1], d[2] = precopse(P, A, 𝒻W, params)
+    nothing
+end
+
+function precopse!(du, u, p, t)::Nothing
+    @inbounds precopse!(du, u[1], u[2], p[1], p[2])
     nothing
 end
 
 #------------------------------------------------------------------------------
-# integration functions
+# integration of the model
 
-function precopse(t, P₀, A₀, 𝒻W::F, param) where {F}
+export integrate
+
+function integrate(t, 𝒻W::F, params::NamedTuple=initparams()) where {F}
     #initial conditions
-    u₀ = Float64[P₀, A₀]
+    u₀ = Float64[params[:P₀], params[:A₀]]
     #time span
     tspan = (0.0, Float64(t))
-    #parameter set, including weathering function
-    p = (𝒻W, param)
+    #bundle function with numeric parameters
+    p = (𝒻W, params)
     #problem definition
+    prob = ODEProblem(precopse!, u₀, tspan, p)
+    #run the solver
+    sol = solve(prob, Rodas4P())
+    #return only the CO2 concentration and time
+    sol.t, 𝒻pCO2.(sol[2,:], params[:h])
 end
 
 end

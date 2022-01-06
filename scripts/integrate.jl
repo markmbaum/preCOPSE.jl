@@ -1,87 +1,66 @@
 using preCOPSE
+using PyPlot
 using OrdinaryDiffEq
 
-#------------------------------------------------------------------------------
-# immutable physical constants
+pygui(true)
 
-#the Earth's mean radius [m]
-const 𝐑ₑ = 6.371e6
+## define weathering as a function of pCO2 alone
 
-#the Earth's surface area [m^2]
-const 𝐒ₑ = 4π*𝐑ₑ^2
-
-#surface gravity [m/s^2]
-const 𝐠 = 9.8
-
-#seconds in a year
-const 𝐲𝐫 = 31536000.0
-
-#stefan-boltzmann constant [m^-2 K^-4]
-const 𝛔 = 5.67e-8 
-
-# Runoff linearization 
-function q(T,T₀,ϵ,Γ,Pref)
-    q = max(Γ*Pref*(1 + ϵ*(T-T₀)),0)
+function weathering_mac(pCO2)
+    #temperature
+    T = 288 + 4.5*log2(pCO2/285e-6)
+    #runoff
+    q = max(0.2*(1/year)*(1 + 0.03*(T - 288)), 0)
+    #weathering rate per unit area
+    w = mac(q, T, pCO2, 11.1, 288, 285e-6,Λ=0.005455)#,L=1.5587652489,Λ=0.0084)
+    #scale to 30 % land fraction
+    w*0.3*𝐒ₑ*year
 end
 
-#------------------------------------------------------------------------------
-function mac(pCO2, 
-    Tₑ=11.1, 
-    T₀=288,
-    pCO2₀=285e-6,
-    n=0.316,
-    Λ=1.4e-3,
-    L=1.0,
-    ϕ=0.1,
-    ρ=12728.0,
-    k₀=8.7e-6,
-    𝐀=1e2,
-    X=0.36,
-    tₛ=1e5,
-    m=0.27,
-    μ=exp(2),
-    β=0.2,
-    ϵ=0.03,
-    Γ=0.2,
-    Pref=1/𝐲𝐫,
-    λ=4.5)
-T = 278 + λ*log2(pCO2/pCO2₀)
-#println(T)
-r = q(T,T₀,ϵ,Γ,Pref)
-#println(r*𝐲𝐫)
-#defined for convenience
-α = L*ϕ*ρ*𝐀*X*μ
-#equilibrium concentration
-Ceq = 1e3*Λ*(pCO2^n) #conversion from mol/liter to mol/m3
-#temperature dependence
-a = exp((T - T₀)/Tₑ)
-#pCO2 dependence
-b = (pCO2/pCO2₀)^β
-#denominator
-d = 1/(k₀*a*b) + m*𝐀*tₛ + α/(r*𝐲𝐫*Ceq)
-#weathering per unit area 
-(α/d)/𝐲𝐫
+W = 7.5e12
+wref = W/(0.3*𝐒ₑ*year)
+function weathering_whak(pCO2)
+    #temperature
+    T = 288 + 4.5*log2(pCO2/285e-6)
+    #runoff
+    q = max(0.2*(1/year)*(1 + 0.03*(T - 288)), 0)
+    #weathering rate per unit area
+    w = whak(q, T, pCO2, 0.24506705893859612, 11.1, 288, 285e-6)#,L=1.5587652489,Λ=0.0084)
+    #scale to 30 % land fraction
+    w*0.3*𝐒ₑ*year
 end
 
-k1    = 9e-15    # mol C yr⁻¹ Total organic carbon burial
-k2    = 1.5e10   # mol P yr⁻¹ Ca associated phosphorus burial
-k3    = 6e9      # mol P yr⁻¹ Fe associated phosphorus burial
-k4    = 0.86     # -          Initial oxic fraction
-k5    = 6.65e12  # mol C yr⁻¹ Silicate weathering
-k6    = 1.335e13 # mol C yr⁻¹ Carbonate weathering
-k7    = 7.75e12  # mol C yr⁻¹ Oxidative weathering
-k8    = 5.7e10   # mol P yr⁻¹ Reactive phosphorus weathering
-k9    = 1.25e12  # mol C yr⁻¹ Organic carbon degassing
-k10   = 6.65e12  # mol C yr⁻¹ Carbonate carbon degassing
-CPsea = 250      # mol:mol    C:P burial ratio
-A₀    = 3.193e18 # mol        Present day atmosphere/ocean CO2
-P₀    = 3.1e15   # mol        Present day ocean phosphate
-O₀    = 3.7e19   # mol        Present day atmosphere/ocean O2
-h     = 2.32746  # mol        Partitioning value for pCO2
-W₀    = 7.5e12   # mol/yr     Past value of 
+## parameter values
 
-p     = [mac,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,CPsea,A₀,P₀,O₀,h,W₀]
-u0    = [3.1e15;1e20]
-tspan = (0.0,1000*𝐲𝐫)
-prob  = ODEProblem(precopse!,u0,tspan,p)
-sol   = solve(prob)
+#param = initparams(h=2.326e20,k1=7.5e12,k7=7.5e12,V=7.5e12)
+#param = initparams(h=2.326e20,k1=1.05e13,k7=1/05e13,V=7.5e12,k3=0)
+param = initparams(h=2.326e20,k=3.3e10,k3=0,k7=6.375e12,V=7.4992382839015205e12)#,k1=0)#,k1=0,k7=0,V=7.5e12)
+
+## integrate
+p = (weathering_mac, params)
+u0 = [3.7e15, 3.193e18] #1e20
+u0 = [3.7e15, 1e20] #1e20
+u0 = [6e15, 1.25e20] #1e20
+tspan = (0.0, 1e6)
+prob = ODEProblem(ℱ!, u0, tspan, p)
+sol1 = solve(prob, RadauIIA5())
+
+## integrate
+p = (weathering_whak, param)
+u0 = [3.7e15, 3.193e18] #1e20
+u0 = [3.7e15, 1e20] #1e20
+u0 = [6e15, 1.25e20] #1e20
+tspan = (0.0, 1e5)
+prob = ODEProblem(ℱ!, u0, tspan, p)
+sol2 = solve(prob, RadauIIA5())
+
+figure()
+plot(sol2.t,𝒻pCO2.(sol2[2,:],param.h)*1e6)
+
+figure()
+plot(sol1.t,𝒻pCO2.(sol1[2,:],param.h)*1e6)
+plot(sol2.t,𝒻pCO2.(sol2[2,:],param.h)*1e6)
+
+
+# figure()
+# plot(sol.t,sol[1,:])
