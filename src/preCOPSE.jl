@@ -39,12 +39,12 @@ function initparams(𝒯::Type=Float64;
                     P₀::Real=6e15,
                     A₀::Real=3.193e18,
                     W₀::Real=7.5e12,
-                    h::Real=2.326925e20,
+                    h::Real=2.3269250670587494e20,
                     k₁::Real=4.5e12,
                     k₂::Real=1.5e10,
                     k₃::Real=6e9,
                     k₇::Real=4.5e12,
-                    k₈::Real=2.349558e10,
+                    k₈::Real=2.3495580286e10,
                     CPsea::Real=250,
                     O::Real=1.76e18,
                     O₀::Real=3.7e19,
@@ -69,7 +69,7 @@ end
 #------------------------------------------------------------------------------
 # the system of ODES
 
-export 𝒻ϕ, 𝒻pCO2, 𝒻mocb, 𝒻fepb, ℱ!
+export 𝒻ϕ, 𝒻pCO2, 𝒻mocb, 𝒻fepb, precopse, precopse!
 
 #fraction of carbon in the atmososphere [-]
 # A - total ocean-atmosphere CO2 [mole]
@@ -131,19 +131,61 @@ end
 
 export integrate
 
-function integrate(t, 𝒻W::F, params::NamedTuple=initparams()) where {F}
+function integrate(tspan::Tuple,
+                   𝒻W::F,
+                   params::NamedTuple=initparams();
+                   kw...) where {F}
     #initial conditions
     u₀ = Float64[params[:P₀], params[:A₀]]
-    #time span
-    tspan = (0.0, Float64(t))
     #bundle function with numeric parameters
     p = (𝒻W, params)
     #problem definition
-    prob = ODEProblem(precopse!, u₀, tspan, p)
+    prob = ODEProblem(precopse!, u₀, map(Float64, tspan), p)
     #run the solver
-    sol = solve(prob, Rodas4P())
+    solve(prob, Rodas4P(); kw...)
+end
+
+function integrate(t::Real,
+                   𝒻W::F,
+                   params::NamedTuple=initparams();
+                   kw...) where {F}
+    #run the solver
+    sol = integrate((0.0, Float64(t)), 𝒻W, params; kw...)
     #return only the CO2 concentration and time
-    sol.t, 𝒻pCO2.(sol[2,:], params[:h])
+    𝒻pCO2(sol[2,end], params[:h])
+end
+
+function integrate(t::AbstractVector,
+                   𝒻W::F,
+                   params::NamedTuple=initparams();
+                   kw...) where {F}
+    #run the solver
+    sol = integrate((0.0, maximum(t)), 𝒻W, params; kw...)
+    #dense output for carbon reservoir
+    A = sol(t, idxs=2)
+    #return only the CO2 concentration and time
+    𝒻pCO2.(A, params[:h])
+end
+
+#------------------------------------------------------------------------------
+# versions of MAC and WHAK that are at rest with default parameters
+
+export 𝒻T, 𝒻q, mac₀, whak₀
+
+const Tₑ = 11.1
+const T₀ = 288
+const pCO2₀ = 285e-6
+
+𝒻T(pCO2) = 288 + 4.5*log2(pCO2/285e-6)
+
+𝒻q(pCO2) = max(0.2*(1/year)*(1 + 0.03*(𝒻T(pCO2) - 288)), 0)
+
+function mac₀(pCO2) 
+    0.3*𝐒ₑ*year*mac(𝒻q(pCO2), 𝒻T(pCO2), pCO2, Tₑ, T₀, pCO2₀, Λ=0.005455935160109789)
+end
+
+function whak₀(pCO2)
+    0.3*𝐒ₑ*year*whak(𝒻q(pCO2), 𝒻T(pCO2), pCO2, 0.24506705893859618, Tₑ, T₀, pCO2₀)
 end
 
 end

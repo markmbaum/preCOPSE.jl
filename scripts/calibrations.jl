@@ -4,6 +4,8 @@ using preCOPSE
 import GEOCLIM: mac, whak
 using PyPlot
 
+pygui(true)
+
 ##
 
 # present day atmosphere/ocean CO2 [mole]
@@ -52,7 +54,7 @@ println("k = $k → whacₚ = $(whakₚ(pCO2₀, k))")
 
 function macloss(k₇, k₈, Λ)
     params = initparams(k₇=k₇, k₈=k₈)
-    sum(precopse(P₀, A₀, pCO2->macₚ(pCO2; Λ=Λ), params).^2)
+    sum(precopse(P₀, A₀, pCO2->macₚ(pCO2₀; Λ=Λ), params).^2)
 end
 
 res = optimize(
