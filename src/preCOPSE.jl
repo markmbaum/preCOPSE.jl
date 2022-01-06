@@ -8,6 +8,8 @@ export mac, whak
 #------------------------------------------------------------------------------
 # immutable physical constants
 
+export 𝐑ₑ, 𝐒ₑ, 𝐠, year
+
 #the Earth's mean radius [m]
 const 𝐑ₑ = 6.371e6
 
@@ -18,46 +20,47 @@ const 𝐒ₑ = 4π*𝐑ₑ^2
 const 𝐠 = 9.8
 
 #seconds in a year
-const 𝐲𝐫 = 31536000.0
+const year = 31536000.0
 
 #molar mass of CO2 [kg/mole]
 const 𝛍 = 0.044
-
-#stefan-boltzmann constant [m^-2 K^-4]
-const 𝛔 = 5.67e-8
 
 #------------------------------------------------------------------------------
 # initializing parameter values for integration
 
 export initparams
 
-function initparams(;
-    W0::Real=7.5e12,
-    h::Real=2.32746,
-    k1::Real=4.5e12,
-    k2::Real=1.5e10,
-    k3::Real=6e9,
-    k7::Real=7.75e12,
-    k8::Real=5.7e10,
-    CPsea::Real=250,
-    P0::Real=3.1e15,
-    O::Real=1.76e18,
-    O0::Real=3.7e19,
-    V::Real=7.9e12)
-    #construct a named tuple containing all the parameters
+#===
+Handy function for creating named tuple of parameters with default values
+which can be overridden by keywords. Parameters will all have the same type,
+as specified by the only non-keyword arg.
+===#
+function initparams(𝒯::Type=Float64;
+                    W0::Real=7.5e12,
+                    h::Real=2.32746,
+                    k1::Real=4.5e12,
+                    k2::Real=1.5e10,
+                    k3::Real=6e9,
+                    k7::Real=7.75e12,
+                    k8::Real=5.7e10,
+                    CPsea::Real=250,
+                    P0::Real=3.1e15,
+                    O::Real=1.76e18,
+                    O0::Real=3.7e19,
+                    V::Real=7.9e12)
     (
-        W0    = Float64(W0),
-        h     = Float64(h),
-        k1    = Float64(k1),
-        k2    = Float64(k2),
-        k3    = Float64(k3),
-        k7    = Float64(k7),
-        k8    = Float64(k8),
-        CPsea = Float64(CPsea),
-        P0    = Float64(P0),
-        O     = Float64(O),
-        O0    = Float64(O0),
-        V     = Float64(V)
+        W0    = 𝒯(W0),
+        h     = 𝒯(h),
+        k1    = 𝒯(k1),
+        k2    = 𝒯(k2),
+        k3    = 𝒯(k3),
+        k7    = 𝒯(k7),
+        k8    = 𝒯(k8),
+        CPsea = 𝒯(CPsea),
+        P0    = 𝒯(P0),
+        O     = 𝒯(O),
+        O0    = 𝒯(O0),
+        V     = 𝒯(V)
     )
 end
 
@@ -114,6 +117,19 @@ function ℱ!(du, u, param, t)::Nothing
     du[2] = -mocb - W + oxidw + V
     #empty return value
     nothing
+end
+
+#------------------------------------------------------------------------------
+# integration functions
+
+function precopse(t, P₀, A₀, 𝒻W::F, param) where {F}
+    #initial conditions
+    u₀ = Float64[P₀, A₀]
+    #time span
+    tspan = (0.0, Float64(t))
+    #parameter set, including weathering function
+    p = (𝒻W, param)
+    #problem definition
 end
 
 end

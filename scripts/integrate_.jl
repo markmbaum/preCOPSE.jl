@@ -4,17 +4,6 @@ using OrdinaryDiffEq
 
 pygui(true)
 
-##
-
-#the Earth's mean radius [m]
-const 𝐑ₑ = 6.371e6
-
-#the Earth's surface area [m^2]
-const 𝐒ₑ = 4π*𝐑ₑ^2
-
-#seconds in a year
-const year = 31536000.0
-
 ## define weathering as a function of pCO2 alone
 
 function weathering(pCO2)
