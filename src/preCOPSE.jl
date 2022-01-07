@@ -142,6 +142,7 @@ function integrate(tspan::Tuple,
     #problem definition
     prob = ODEProblem(precopse!, u₀, map(Float64, tspan), p)
     #run the solver
+    println(kw)
     solve(prob, Rodas4P(); kw...)
 end
 
