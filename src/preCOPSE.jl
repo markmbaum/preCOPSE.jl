@@ -30,11 +30,26 @@ const 𝛍 = 0.044
 
 export initparams
 
-#===
+#==============================================================================
 Handy function for creating named tuple of parameters with default values
 which can be overridden by keywords. Parameters will all have the same type,
 as specified by the only non-keyword arg.
-===#
+
+Parameters:
+ P₀ - initial ocean phosphate reservoir [mole]
+ A₀ - initial ocean-atmosphere CO2 reservoir [mole]
+ W₀ - reference weathering rate [mole/yr]
+ h - parameter fit for partitioning CO2 between ocean & atmosphere [mole]
+ k₁ - total organic carbon burial rate [mole/yr]
+ k₂ - Ca associated phosphorus burial [mole/yr]
+ k₃ - Fe associated phosphorus burial [mole/yr]
+ k₇ - oxidative weathering [mole/yr]
+ k₈ - reactive phosphorus weathering [mole/yr]
+ CPsea - C:P burial ratio
+ O - ocean-atmosphere oxygen reservoir [mole/yr]
+ O₀ - reference (present-day) ocean-atmosphere oxygen reservoir [mole/yr]
+ V - volcanic CO2 outgassing [mole/yr]
+==============================================================================#
 function initparams(𝒯::Type=Float64;
                     P₀::Real=6e15,
                     A₀::Real=3.193e18,
